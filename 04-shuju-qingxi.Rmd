@@ -160,6 +160,7 @@ erl %>%
   geom_text(aes(x=1.3, y= text.y1, label = mylabel2, size = 2)) +
   coord_polar(theta = "y", direction = 1) +
   mytheme + pie_theme 
+
 ```
 
 
