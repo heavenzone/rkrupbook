@@ -3,7 +3,9 @@
 ```{r setup}
 require(tidyverse)
 require(readxl)
-
+require(ggthemr)
+require(TeachingDemos)
+ggthemr('light', spacing = 0.5, type = 'inner')
 # 读入excel文件
 exams03 <- read_excel("data/exams_results.xlsx")
 
@@ -165,7 +167,7 @@ u.test <- function(a, mu, sigma) {
   return(list(u=u, p=p))
 }
 u.test(samp, 5, 1)
-z.test(samp,mu = 5,sigma.x = 1)$statistic
+z.test(samp,mu = 5,stdev = 1)
 ```
 
 
@@ -207,17 +209,20 @@ myfun <- function(min = -3, max = 3){
   }
 }
 
-dnorm2 <- function(min,max){
-    y <- dnorm(x,5,1)
-    y[x< min | x>max] <- NA
-    return(y)
+dnorm2 <- function(min,max,mean = 0, sd = 1){
+    function(x){
+      y <- dnorm(x,mean,sd)
+      y[x< min | x>max] <- NA
+      return(y)
+    }
 }
-
+samp.left <- z.test(samp,5,1)$conf.int[1]
+samp.right <- z.test(samp,5,1)$conf.int[2]
 ggplot(NULL, aes(x = samp)) +
-  stat_function(fun=dnorm2(-Inf, -1.96), geom="area", fill="red", alpha=0.2) +  
-  stat_function(fun=dnorm2(1.96, Inf), geom="area", fill="red", alpha=0.2) +
-  stat_function(fun = dnorm,args = list(mean = 5, sd = 1),aes(x = -3:3, color = "标准")) + 
-  geom_vline(xintercept = z.test(samp,mu = 5,sigma.x = 1)$statistic) +
+  stat_function(fun=dnorm2(-Inf, samp.left, 5, 1), geom="area", fill="red", alpha=0.2) +  
+  stat_function(fun=dnorm2(samp.right, Inf, 5, 1),  geom="area", fill="red", alpha=0.2) +
+  stat_function(fun = dnorm,args = list(mean = 5, sd = 1),aes(x = -4:8, color = "标准")) + 
+  geom_vline(xintercept = z.test(samp,5, 1)$statistic) +
   scale_colour_manual("Lgend title", values = c("red", "blue"))
 
 ```
@@ -237,7 +242,44 @@ conf.int <- function(x,sigma,alpha){
 
 
 conf.int(samp, 1, 0.05)
+z.test(samp, 5, 1)
 ```
+
+```{r test}
+
+ztplot <- function(sample, mu, sd = 1, alter = "both"){
+  sample <- samp
+  mu <- 5
+  sd <- 1
+  mean = sample
+  dnorm2 <- function(min,max,mean = 0, sd = 1){
+      function(x){
+        y <- dnorm(x,mean,sd)
+        y[x< min | x>max] <- NA
+        return(y)
+      }
+  }
+  samp.left <- z.test(sample,mean,sd)$conf.int[1]
+  samp.right <- z.test(sample,mean,sd)$conf.int[2]
+  p <- ggplot(NULL, aes(x = sample))
+  p <- p + stat_function(fun = dnorm2(-Inf, samp.left, mean, sd), geom="area", fill="red", alpha=0.2)
+  p <- p + stat_function(fun = dnorm2(samp.right, Inf, mean, sd), geom="area", fill="red", alpha=0.2) 
+  p <- p + stat_function(fun = dnorm,args = list(mean = mean, sd = sd),aes(x = c(samp.left:samp.right), color = "标准"))  
+  #p <- p + geom_vline(xintercept = z.test(sample,mean, sd)$statistic)
+  p <- p + geom_vline(xintercept = mu) 
+  p <- p + scale_colour_manual("Lgend title", values = c("red", "blue"))
+  
+  print(p)
+}
+
+x<-c(175,176,173,175,174,173,173,176,173,179)
+
+#z.test(x,10,1.5,0.05)
+test <- rnorm(n = 100,sd = 1,mean = 0)
+ztplot(samp, 5, sd = 1)
+z.test(test,0,1)
+```
+
 
 
 ### 单样本方差方差检验
