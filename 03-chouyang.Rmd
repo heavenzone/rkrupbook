@@ -165,11 +165,80 @@ u.test <- function(a, mu, sigma) {
   return(list(u=u, p=p))
 }
 u.test(samp, 5, 1)
+z.test(samp,mu = 5,sigma.x = 1)$statistic
 ```
+
 
 判断：p-value大于0.05，不能拒绝原假设，认为生产的零件符合直径是5cm。
 
+
+```{r}
+plot_area <- function(min,max){
+  function(x){
+    y <- dnorm(x)
+    y[x<min | x>max] <-NA
+    return(y)
+  }
+}
+
+krup.dnorm_area <- function(min = -Inf,max = Inf,mean = 0, sd = 1){
+  function(x){
+    y <- dnorm(x , mean, sd)
+
+    y[x<min | x>max] <- NA
+    return(y)
+  }
+}
+
+ggplot(NULL,aes(samp)) + # geom_histogram() +
+  stat_function(fun=plot_area(-Inf, -1.96), geom="area", fill="red", alpha=0.2) +  
+  stat_function(fun=plot_area(1.96, Inf), geom="area", fill="red", alpha=0.2) +
+  stat_function(fun=plot_area(-1, 1), geom="area", fill="#ffccdd", alpha=0.2) +
+  stat_function(fun=dnorm) +
+  geom_text(aes(y=0.2, x=0), label="70",parse = TRUE) +
+  geom_text(aes(y=0.025, x=-2),label="2.5%") +
+  geom_text(aes(y=0.025, x=2),label="2.5%")
+
+myfun <- function(min = -3, max = 3){
+  function(x){
+    y <- dnorm(x)
+    y[x<min | x>max] <- NA
+    return(y)
+  }
+}
+
+dnorm2 <- function(min,max){
+    y <- dnorm(x,5,1)
+    y[x< min | x>max] <- NA
+    return(y)
+}
+
+ggplot(NULL, aes(x = samp)) +
+  stat_function(fun=dnorm2(-Inf, -1.96), geom="area", fill="red", alpha=0.2) +  
+  stat_function(fun=dnorm2(1.96, Inf), geom="area", fill="red", alpha=0.2) +
+  stat_function(fun = dnorm,args = list(mean = 5, sd = 1),aes(x = -3:3, color = "标准")) + 
+  geom_vline(xintercept = z.test(samp,mu = 5,sigma.x = 1)$statistic) +
+  scale_colour_manual("Lgend title", values = c("red", "blue"))
+
+```
+
+
+
 ### 单样本均值检验
+
+```{r}
+conf.int <- function(x,sigma,alpha){
+  mean = mean(x)
+  n=length(x)
+  z = qnorm(1 - alpha/2, mean - 0, sd = 1, lower.tail = TRUE)
+  conf <- c(mean = sigma*z/sqrt(n), mean + sigma*z / sqrt(n))
+  return(list(conf = conf, z = z))
+}
+
+
+conf.int(samp, 1, 0.05)
+```
+
 
 ### 单样本方差方差检验
 
