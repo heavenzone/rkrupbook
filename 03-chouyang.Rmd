@@ -1,10 +1,15 @@
+---
+output:
+  html_document: default
+---
+
 # 统计学与R语言
 
 ```{r setup}
 require(tidyverse)
 require(readxl)
 require(ggthemr)
-require(TeachingDemos)
+require(BSDA)
 ggthemr('light', spacing = 0.5, type = 'inner')
 # 读入excel文件
 exams03 <- read_excel("data/exams_results.xlsx")
@@ -121,6 +126,7 @@ hist(x, probability = TRUE)
 f <- function(n = 10){
   mean(runif(n)-1/2) / (1/sqrt(12*n))
 }
+
 x <- sim.fun(1000, f)
 hist(x, probability = TRUE)
 
@@ -145,6 +151,7 @@ hist(x, breaks = 10, probability = TRUE)
 
 - 原假设$H_0$：直径为5cm，$\mu=\mu_0=5$
 - 备择假设$H_1$：$\mu \neq \mu = 5$
+- 显著性水平取值：$\alpha = 0.05$
 
 构建统计量：
 
@@ -167,12 +174,105 @@ u.test <- function(a, mu, sigma) {
   return(list(u=u, p=p))
 }
 u.test(samp, 5, 1)
-z.test(samp,mu = 5,stdev = 1)
+```
+
+结果显示u统计量为0.5657252，p值为0.5715806。
+
+下面我们用包**BSDA**的z.test来检验一下：
+
+
+```{r}
+require(BSDA)
+u.tmp <- z.test(samp,mu = 5, sigma.x = 1)
+u.tmp
+```
+
+从结果看到，**z = 0.56573**和**p-value = 0.5716**，结果跟上面我们写的函数输出的结果一致。
+
+
+
+判断：p-value大于0.05，不能拒绝原假设，认为生产的零件符合直径是5cm，是可以接受的。
+
+
+
+
+
+### 单样本均值检验
+
+#### 已知总体方差，对总体均值进行检验
+
+例题：某汽车声称其生产的汽车每加仑可以行驶不低于25英里，标准差为2.4英里。消协组织10位汽车主进行记录下来，假定每加仑可行驶里程服从正态分布。
+
+```{r}
+(qiche <- c(22,24,21,24,23,24,23,22,21,25))
 ```
 
 
-判断：p-value大于0.05，不能拒绝原假设，认为生产的零件符合直径是5cm。
 
+我们来检验一下汽车公司的话是否可信。
+
+
+假设：
+
+- 原假设：$H_0:\mu\ge25$
+- 备择假设：$H_1:\mu<25$
+- 显著性水平：$\alpha=0.05$
+
+构建u.test检验函数：
+
+```{r}
+# 前面已经写了u.test函数来对双边的检验
+# 现在做一些修改，让u.test对双边和左侧都可以进行检验
+
+u.test <- function(a, mu, thegma, alternative="twoside"){
+  se = thegma/sqrt(length(a))
+  u = (mean(a)-mu) / se
+  if (alternative == "twoside") p = 2*(1-pnorm(abs(u)))
+  else if (alternative == "less") p = pnorm(u)
+  else p = 1-pnorm(u)
+  return(list(u=u,p=p))
+}
+
+
+```
+
+我们再用前面的例子验证一下这个新的u.test函数
+
+```{r}
+u.test(samp,5,1,"twoside")
+```
+
+结果跟前面一致。
+
+现在再对本例的数据进行检验：
+
+```{r}
+u.test(qiche, 25, 2.4, "less")
+```
+
+从p值可以看出统计量值-2.766993落在拒绝域内，可以认为汽车厂的话不可信。
+
+我们也可以通过比较u统计量来观察是否落在拒绝域，通过qnorm计算左侧显著性水平$\alpha=0.05$处的统计量:
+
+```{r}
+qnorm(0.05, 0, 1)
+```
+
+由于前面算出来的-2.766比$\alpha=0.05$所对应的统计量要小，所以落在拒绝域内，拒绝原假设。
+
+
+我们也可以再用TeachingDemos中的z.test来检验一下：
+
+```{r}
+z.test(qiche, mu = 25, sigma.x = 2.4,alternative = "less")
+```
+
+结果跟和我们自己构建的函数算出来的结果一致。
+
+从这个结果我们也得到了这个样本左侧检验的95%的置信区间为：[-Inf, 24.14]，汽车厂声称的25落在这个置信区间的外面。
+
+
+下面我们画图观察一下：
 
 ```{r}
 plot_area <- function(min,max){
@@ -183,53 +283,20 @@ plot_area <- function(min,max){
   }
 }
 
-krup.dnorm_area <- function(min = -Inf,max = Inf,mean = 0, sd = 1){
-  function(x){
-    y <- dnorm(x , mean, sd)
-
-    y[x<min | x>max] <- NA
-    return(y)
-  }
-}
-
-ggplot(NULL,aes(samp)) + # geom_histogram() +
-  stat_function(fun=plot_area(-Inf, -1.96), geom="area", fill="red", alpha=0.2) +  
-  stat_function(fun=plot_area(1.96, Inf), geom="area", fill="red", alpha=0.2) +
-  stat_function(fun=plot_area(-1, 1), geom="area", fill="#ffccdd", alpha=0.2) +
+ggplot(NULL,aes(-3:3)) + # geom_histogram() +
+  stat_function(fun=plot_area(-Inf, -1.64), geom="area", fill="red", alpha=0.2) +  
   stat_function(fun=dnorm) +
-  geom_text(aes(y=0.2, x=0), label="70",parse = TRUE) +
-  geom_text(aes(y=0.025, x=-2),label="2.5%") +
-  geom_text(aes(y=0.025, x=2),label="2.5%")
-
-myfun <- function(min = -3, max = 3){
-  function(x){
-    y <- dnorm(x)
-    y[x<min | x>max] <- NA
-    return(y)
-  }
-}
-
-dnorm2 <- function(min,max,mean = 0, sd = 1){
-    function(x){
-      y <- dnorm(x,mean,sd)
-      y[x< min | x>max] <- NA
-      return(y)
-    }
-}
-samp.left <- z.test(samp,5,1)$conf.int[1]
-samp.right <- z.test(samp,5,1)$conf.int[2]
-ggplot(NULL, aes(x = samp)) +
-  stat_function(fun=dnorm2(-Inf, samp.left, 5, 1), geom="area", fill="red", alpha=0.2) +  
-  stat_function(fun=dnorm2(samp.right, Inf, 5, 1),  geom="area", fill="red", alpha=0.2) +
-  stat_function(fun = dnorm,args = list(mean = 5, sd = 1),aes(x = -4:8, color = "标准")) + 
-  geom_vline(xintercept = z.test(samp,5, 1)$statistic) +
-  scale_colour_manual("Lgend title", values = c("red", "blue"))
-
+  geom_vline(aes(xintercept = -2.766)) +
+  geom_text(aes(y=0.2, x=0), label="接受区域",parse = TRUE) +
+  geom_text(aes(y=0.025, x=-1.5),label="5%:拒绝域") +
+  geom_text(aes(y=0.3, x= -2.6), label="u统计量位置")
 ```
 
 
 
-### 单样本均值检验
+从上面分析可以看到，我们有几种方式可以进行检验，比较统计量、比较p值、与置信区间比较，都可以判断是否拒绝原假设。
+
+
 
 ```{r}
 conf.int <- function(x,sigma,alpha){
@@ -242,51 +309,100 @@ conf.int <- function(x,sigma,alpha){
 
 
 conf.int(samp, 1, 0.05)
-z.test(samp, 5, 1)
 ```
 
-```{r test}
 
-ztplot <- function(sample, mu, sd = 1, alter = "both"){
-  sample <- samp
-  mu <- 5
-  sd <- 1
-  mean = sample
-  dnorm2 <- function(min,max,mean = 0, sd = 1){
-      function(x){
-        y <- dnorm(x,mean,sd)
-        y[x< min | x>max] <- NA
-        return(y)
-      }
-  }
-  samp.left <- z.test(sample,mean,sd)$conf.int[1]
-  samp.right <- z.test(sample,mean,sd)$conf.int[2]
-  p <- ggplot(NULL, aes(x = sample))
-  p <- p + stat_function(fun = dnorm2(-Inf, samp.left, mean, sd), geom="area", fill="red", alpha=0.2)
-  p <- p + stat_function(fun = dnorm2(samp.right, Inf, mean, sd), geom="area", fill="red", alpha=0.2) 
-  p <- p + stat_function(fun = dnorm,args = list(mean = mean, sd = sd),aes(x = c(samp.left:samp.right), color = "标准"))  
-  #p <- p + geom_vline(xintercept = z.test(sample,mean, sd)$statistic)
-  p <- p + geom_vline(xintercept = mu) 
-  p <- p + scale_colour_manual("Lgend title", values = c("red", "blue"))
-  
-  print(p)
+#### **未知**总体方差，对总体均值进行检验
+
+通常我们是不知道总体标准差的，在这种情况下，我们使用t检验。
+
+假设上面的汽车案例中，标准差不知道，下面我们再通过t检验来看看汽车厂是否可信。
+
+```{r}
+t.test(qiche,mu = 25,alternative = "less",conf.level = 0.95)
+```
+
+
+我们发现p值为0.0004566，也是小于0.05，我们可以拒绝原假设。
+
+另外我们发现置信区间为：[-Inf, 23.69]，也就是这个区域比前面已知标准差的情况下置信区间小了。
+
+也就是说在不知道标准差的情况下，可信区域要比已知标准差的情况要小。
+
+
+
+### 双样本均值检验
+
+#### 两个总体的方差已知
+
+对于两个正态总体，当他们方差都已知时，根据正态分布的性质有：
+
+$$\overline{X}-\overline{Y}\Rightarrow N\{ \mu_1-\mu_2,\frac{\sigma_1^2}{n_1}+\frac{\sigma_2^2}{n_2} \}$$
+
+可以推导得到$\mu_1-\mu_2$的置信水平为$1-\alpha$的双侧置信区间为：
+
+$$[\overline{X}-\overline{Y}-z_{\alpha/2}\sqrt{\frac{\sigma_1^2}{n_1}+\frac{\sigma_2^2}{n_2}}, \overline{X}-\overline{Y}+z_{\alpha/2}\sqrt{\frac{\sigma_1^2}{n_1}+\frac{\sigma_2^2}{n_2}}] $$
+
+首先我们自己构建一个函数来检验：
+
+```{r}
+e1 <- exams03[which(exams03$班级== "六1班"),3][[1]]
+e2 <- exams03[which(exams03$班级== "六2班"),3][[1]]
+
+twosample.ci = function(x,y,alpha,sigma.x, sigma.y){
+  n1 = length(x); n2 = length(y)
+  xbar = mean(x) - mean(y)
+  z = qnorm(1-alpha/2) * sqrt(sigma.x^2/n1+sigma.y^2/n2)
+  c(xbar - z, xbar + z)
 }
 
-x<-c(175,176,173,175,174,173,173,176,173,179)
+twosample.ci(e1,e2,0.05,10,15)
 
-#z.test(x,10,1.5,0.05)
-test <- rnorm(n = 100,sd = 1,mean = 0)
-ztplot(samp, 5, sd = 1)
-z.test(test,0,1)
 ```
+
+最终得到置信区间为：[5.738, 25.338]
+
+
+然后我们用BSDA中的z.test函数来做区间估计：
+
+```{r}
+z.test(x = e1,y = e2,mu = 0,sigma.x = 10,sigma.y = 15,conf.level = 0.95)
+
+```
+
+结果与我们构建的检验函数结果一致。
+
+由于p值为0.0018小于0.05，我们可以认为六1班和六2班的语文成绩有差异。
+
+
+我们再用图形来比较一下两个班的语文成绩分布图吧：
+
+```{r}
+par(mfrow = c(2,1))
+hist(e1, breaks = 10, freq = TRUE)
+hist(e2, breaks = 10, freq = TRUE)
+```
+
+我们可以看到1班的分数多数都分布在50分以上，而2班的分数多数分布在50分以下。
+
+
+#### 两个总体的方差未知，但相等
+
+
+
+
+
+#### 两个总体的方差未知，且不相等
+
+
 
 
 
 ### 单样本方差方差检验
 
-### 双样本均值检验
-
 ### 双样本方差检验
+
+
 
 ### 单样本比例检验
 
